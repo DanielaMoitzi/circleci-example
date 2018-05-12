@@ -7,8 +7,8 @@ jobs:
   build:
     docker:
       # specify the version you desire here
-       - image: ruby:2.5.1
-       - image: circleci/node:latest
+      - image: ruby:2.5.1
+    #    - image: circleci/node:latest
       
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
@@ -41,18 +41,22 @@ jobs:
         
       # Database setup
       - run:
-          command: |
-            bundle exec rake db:create
-            bundle exec rails db:migrate
+            name: setup database
+            command: |
+                bundle exec rake db:create
+                bundle exec rails db:migrate
 
-      # run tests!
+      # run tests
       - run:
           name: unit-tests
           command: |
-            # curl -sL https://deb.nodesource.com/setup_8.x | bash -
-            # apt-get install -y nodejs
-
             bin/rails test test/models/*.rb
+          
+          name: acceptance-tests
+          command: |
+            bin/rails test test/controllers/*.rb
+
+      
 
       # collect reports
       - store_test_results:
