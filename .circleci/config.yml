@@ -38,10 +38,6 @@ jobs:
           paths:
             - ~/repo/vendor/bundle
           key: v1-dependencies-{{ checksum "Gemfile.lock" }}
-      
-      - persist_to_workspace:
-          root: .
-          paths: vendor/bundle
         
     
   unit-tests:
@@ -69,18 +65,15 @@ jobs:
       steps:
         - checkout
         - restore_cache:
-            keys:
-            - v1-dependencies-{{ checksum "Gemfile.lock" }}
-            # fallback to using the latest cache if no exact match is found
-            - v1-dependencies-
-
+            key: v1-bundle-{{ checksum "Gemfile.lock" }}
         - run:
-            name: acceptance-tests
             command: |
-              bundle install --path vendor/bundle
+              bundle  # --jobs=4 --retry=3 --path vendor/bundle
               curl -sL https://deb.nodesource.com/setup_8.x | bash -
               apt-get install -y nodejs
-              bin/rails test test/controllers/*.rb
+        - run:
+            name: acceptance-tests
+            command: bin/rails test test/models/*.rb
 
       
 
