@@ -76,7 +76,7 @@ jobs:
         - checkout
         - run:
             command: |
-              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+              bundle
         - run:
             name: security-scan
             command: brakeman
@@ -92,7 +92,7 @@ jobs:
             key: v1-bundle-{{ checksum "Gemfile.lock" }}
         - run:
             command: |
-              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+              bundle
               curl -sL https://deb.nodesource.com/setup_8.x | bash -
               apt-get install -y nodejs
         - run:
@@ -110,7 +110,7 @@ jobs:
             key: v1-bundle-{{ checksum "Gemfile.lock" }}
         - run:
             command: |
-              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+              bundle
               curl -sL https://deb.nodesource.com/setup_8.x | bash -
               apt-get install -y nodejs
         - run:
@@ -156,9 +156,9 @@ workflows:
       - acceptance-tests:
           requires:
             - lint
-            # - unit-tests
-            # - securtiy-scan
-            # - dependency-check
+            - unit-tests
+            - security-scan
+            - dependency-check
       - deploy:
           requires:
             - acceptance-tests
@@ -166,10 +166,6 @@ workflows:
 
 
 # https://gist.github.com/osulyanov/4fe6d8217ad63afbd5ee4dff0341afaf
-
-
-# The following stanza defines a map named defaults with a variable that may be inserted using the YAML merge (<<: *) key 
-# later in the file to save some typing. See http://yaml.org/type/merge.html for details.
 
 
 
