@@ -4,63 +4,159 @@
 #
 version: 2
 jobs:
-  build:
+  bundle_dependencies:
     docker:
-      # specify the version you desire here
       - image: ruby:2.5.1
-    #    - image: circleci/node:latest
-      
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
 
-    working_directory: ~/git@github.com:DanielaMoitzi/circleci-example.git
+    working_directory: ~/repo
 
     steps:
       - checkout
+      - attach_workspace:
+          at: ~/repo
 
       # Download and cache dependencies
       - restore_cache:
           keys:
           - v1-dependencies-{{ checksum "Gemfile.lock" }}
-          # fallback to using the latest cache if no exact match is found
           - v1-dependencies-
 
       - run:
           name: install dependencies
           command: |
-            bundle install # --jobs=4 --retry=3 --path vendor/bundle
+            bundle install --path vendor/bundle # --jobs=4 --retry=3 --path vendor/bundle 
             curl -sL https://deb.nodesource.com/setup_8.x | bash -
             apt-get install -y nodejs
 
+      - run:
+          name: setup database
+          command: |
+            bundle exec rake db:create
+            bundle exec rails db:migrate
+
       - save_cache:
           paths:
-            - ./vendor/bundle
+            - ~/repo/vendor/bundle
           key: v1-dependencies-{{ checksum "Gemfile.lock" }}
+      
+      - persist_to_workspace:
+          root: .
+          paths: vendor/bundle
         
-      # Database setup
-      - run:
-            name: setup database
+    
+  unit-tests:
+      docker:
+        - image: ruby:2.5.1
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - restore_cache:
+            key: v1-bundle-{{ checksum "Gemfile.lock" }}
+        - run:
             command: |
-                bundle exec rake db:create
-                bundle exec rails db:migrate
+              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+              curl -sL https://deb.nodesource.com/setup_8.x | bash -
+              apt-get install -y nodejs
+        - run:
+            name: unit-tests
+            command: bin/rails test test/models/*.rb
 
-      # run tests
-      - run:
-          name: unit-tests
-          command: |
-            bin/rails test test/models/*.rb
-          
-          name: acceptance-tests
-          command: |
-            bin/rails test test/controllers/*.rb
+
+  acceptance-tests:
+      docker:
+        - image: ruby:2.5.1
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - restore_cache:
+            keys:
+            - v1-dependencies-{{ checksum "Gemfile.lock" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+        - run:
+            name: acceptance-tests
+            command: |
+              bundle install --path vendor/bundle
+              curl -sL https://deb.nodesource.com/setup_8.x | bash -
+              apt-get install -y nodejs
+              bin/rails test test/controllers/*.rb
 
       
 
       # collect reports
-      - store_test_results:
-          path: /tmp/test-results
-      - store_artifacts:
-          path: /tmp/test-results
-          destination: test-results
+      # - store_test_results:
+      #     path: /tmp/test-results
+      # - store_artifacts:
+      #     path: /tmp/test-results
+      #     destination: test-results
+
+
+workflows:
+  version: 2
+  build-test-deploy:
+    jobs:
+      - bundle_dependencies
+      - unit-tests:
+          requires:
+            - bundle_dependencies
+      - acceptance-tests:
+          requires:
+            - unit-tests
+
+
+
+# https://gist.github.com/osulyanov/4fe6d8217ad63afbd5ee4dff0341afaf
+
+
+# The following stanza defines a map named defaults with a variable that may be inserted using the YAML merge (<<: *) key 
+# later in the file to save some typing. See http://yaml.org/type/merge.html for details.
+
+
+
+
+# defaults: &defaults
+#   docker:
+#     - image: ruby:2.5.1
+#   working_directory: ~/repo
+
+# version: 2
+# jobs:
+#   flow:
+#     <<: *defaults
+#     steps:
+#       - checkout
+#       - run: bundle install --path=vendor/bundle
+
+      
+
+
+#   downstream:
+#     <<: *defaults
+#     steps:
+#       - checkout
+#       - run: 
+#           command: |
+#             curl -sL https://deb.nodesource.com/setup_8.x | bash -
+#             apt-get install -y nodejs
+#             bundle check --path=vendor/bundle || bundle install --path=vendor/bundle --jobs=4 --retry=3
+
+#       - run: bundle exec rake db:create
+#       - run: bundle exec rake db:migrate
+
+#       - run:
+#           name: run tests
+#           command: |
+#             bin/rails test test/controllers/*.rb
+# workflows:
+#   version: 2
+
+#   btd:
+#     jobs:
+#       - flow
+#       - downstream:
+#           requires:
+#             - flow
+
+
+  # https://stackoverflow.com/questions/30666176/circleci-gems-caching

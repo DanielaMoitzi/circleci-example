@@ -1,0 +1,147 @@
+# Ruby CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/language-ruby/ for more details
+#
+version: 2
+jobs:
+  build:
+    docker:
+      - image: ruby:2.5.1
+    working_directory: ~/git@github.com:DanielaMoitzi/circleci-example.git
+    # working_directory: ~/circleci-example
+
+    steps:
+      - checkout
+      - save_cache:
+          key:
+            - v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+            - paths:
+              ~/circleci-example
+      
+
+    # Download and cache dependencies
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "Gemfile.lock" }}
+          # fallback to using the latest cache if no exact match is found
+          - v1-dependencies-
+
+      - run:
+          name: install dependencies
+          command: |
+            bundle install # --jobs=4 --retry=3 --path vendor/bundle
+            curl -sL https://deb.nodesource.com/setup_8.x | bash -
+            apt-get install -y nodejs
+
+      - save_cache:
+          paths:
+            - ./vendor/bundle
+          key: v1-dependencies-{{ checksum "Gemfile.lock" }}
+      
+    # Database setup
+      - run:
+          name: setup database
+          command: |
+              bundle exec rake db:create
+              bundle exec rails db:migrate
+
+
+  unit-tests:
+    docker:
+      - image: ruby:2.5.1
+    working_directory: ~/git@github.com:DanielaMoitzi/circleci-example.git
+    steps:
+      - restore_cache:
+          key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+      - restore_cache:
+          key: v1-bundle-{{ checksum "Gemfile.lock" }}
+      - run:
+        command: |
+          bundle  # --jobs=4 --retry=3 --path vendor/bundle
+          curl -sL https://deb.nodesource.com/setup_8.x | bash -
+          apt-get install -y nodejs
+      - run
+        name: unit-tests
+        command: bin/rails test test/models/*.rb
+
+
+  acceptance-tests:
+      docker:
+        - image: ruby:2.5.1
+      working_directory: ~/git@github.com:DanielaMoitzi/circleci-example.git
+      steps:
+        - restore_cache:
+            key: v1-repo-{{ .Environment.CIRCLE_SHA1 }}
+        - restore_cache:
+            key: v1-bundle-{{ checksum "Gemfile.lock" }}
+        - run:
+          command: |
+            bundle  # --jobs=4 --retry=3 --path vendor/bundle
+            curl -sL https://deb.nodesource.com/setup_8.x | bash -
+            apt-get install -y nodejs
+        - run
+          name: acceptance-tests
+          command: bin/rails test test/controllers/*.rb
+
+  # acceptance-tests:
+  #   - step:
+  #     - checkout
+  #     - run:
+  #       name: acceptance-tests
+  #       command: |
+  #         bin/rails test test/controllers/*.rb
+
+      
+
+      # collect reports
+      # - store_test_results:
+      #     path: /tmp/test-results
+      # - store_artifacts:
+      #     path: /tmp/test-results
+      #     destination: test-results
+
+
+# workflows:
+#   version: 2
+#   my_workflow:
+#     jobs:
+#       - build
+#       - unit-tests
+
+      # - acceptance-tests
+
+#       - unit-tests:
+#           requires:
+#             - build
+#       - acceptance-tests:
+#           requires:
+#               - unit-tests
+
+# workflows:
+#   version: 2
+#   build-and-deploy:
+#     jobs:
+#       - checkout_code
+#       - bundle_dependencies:
+#           requires:
+#             - checkout_code
+#       - rake_test:
+#           requires:
+#             - bundle_dependencies
+
+workflows:
+  version: 2
+  my_workflow:
+    jobs:
+      - build
+      - unit-tests
+          requires:
+            - build
+
+
+# workflows:
+#   version: 2
+#   build_and_test:
+#     jobs:
+#       - build
+#       - test
