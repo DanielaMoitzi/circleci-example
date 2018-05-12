@@ -8,6 +8,7 @@ jobs:
     docker:
       # specify the version you desire here
        - image: ruby:2.5.1
+       - image: circleci/node:latest
       
       # Specify service dependencies here if necessary
       # CircleCI maintains a library of pre-built images
@@ -30,6 +31,8 @@ jobs:
           name: install dependencies
           command: |
             bundle install # --jobs=4 --retry=3 --path vendor/bundle
+            curl -sL https://deb.nodesource.com/setup_8.x | bash -
+            apt-get install -y nodejs
 
       - save_cache:
           paths:
@@ -37,21 +40,19 @@ jobs:
           key: v1-dependencies-{{ checksum "Gemfile.lock" }}
         
       # Database setup
-      - run: bundle exec rake db:create
-      - run: bundle exec rake db:schema:load
+      - run:
+          command: |
+            bundle exec rake db:create
+            bundle exec rails db:migrate
 
       # run tests!
       - run:
-          name: run tests
+          name: unit-tests
           command: |
-            mkdir /tmp/test-results
-            TEST_FILES="$(circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings)"
-            
-            bundle exec rspec --format progress \
-                            --format RspecJunitFormatter \
-                            --out /tmp/test-results/rspec.xml \
-                            --format progress \
-                            $TEST_FILES
+            # curl -sL https://deb.nodesource.com/setup_8.x | bash -
+            # apt-get install -y nodejs
+
+            bin/rails test test/models/*.rb
 
       # collect reports
       - store_test_results:
