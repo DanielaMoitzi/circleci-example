@@ -65,7 +65,7 @@ jobs:
               bundle  # --jobs=4 --retry=3 --path vendor/bundle
         - run:
             name: lint
-            command: rubocop
+            command: rubocop -a
 
   
   security-scan:
