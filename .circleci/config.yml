@@ -39,7 +39,49 @@ jobs:
             - ~/repo/vendor/bundle
           key: v1-dependencies-{{ checksum "Gemfile.lock" }}
         
-    
+  dependency-check:
+      docker:
+        - image: ruby:2.5.1
+        - image: codeclimate/codeclimate-bundler-audit:latest
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - run:
+            command: |
+              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+        - run:
+            name: dependency-check
+            command: bundle audit check --update
+
+
+  lint:
+      docker:
+        - image: ruby:2.5.1
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - run:
+            command: |
+              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+        - run:
+            name: lint
+            command: rubocop
+
+  
+  security-scan:
+      docker:
+        - image: ruby:2.5.1
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - run:
+            command: |
+              bundle  # --jobs=4 --retry=3 --path vendor/bundle
+        - run:
+            name: security-scan
+            command: brakeman
+
+
   unit-tests:
       docker:
         - image: ruby:2.5.1
@@ -75,6 +117,23 @@ jobs:
             name: acceptance-tests
             command: bin/rails test test/models/*.rb
 
+
+  deploy:
+      docker:
+        - image: ruby:2.5.1
+      working_directory: ~/repo
+      steps:
+        - checkout
+        - restore_cache:
+            key: v1-bundle-{{ checksum "Gemfile.lock" }}
+        - run:
+            command: |
+              bundle
+        - run:
+            path: echo
+            args:
+              - 'deploy'
+
       
 
       # collect reports
@@ -90,12 +149,27 @@ workflows:
   build-test-deploy:
     jobs:
       - bundle_dependencies
+      - lint:
+          requires:
+            - bundle_dependencies
       - unit-tests:
+          requires:
+            - bundle_dependencies
+      - security-scan:
+          requires:
+            - bundle_dependencies
+      - dependency-check:
           requires:
             - bundle_dependencies
       - acceptance-tests:
           requires:
-            - unit-tests
+            - lint
+            # - unit-tests
+            # - securtiy-scan
+            # - dependency-check
+      - deploy:
+          requires:
+            - acceptance-tests
 
 
 
